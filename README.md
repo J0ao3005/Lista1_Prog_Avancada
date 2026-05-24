@@ -1,13 +1,83 @@
-MiniCCO-0: Núcleo Geométrico e Estrutural para Crescimento Arterial
+# MiniCCO-0 — Núcleo Geométrico para Crescimento Arterial
 
-Este projeto faz parte da disciplina de Algoritmos e Programação Avançada da Universidade Federal de Ouro Preto.
-O objetivo é implementar um núcleo inicial simplificado baseado no método CCO (Constrained Constructive Optimization) para a construção de árvores arteriais em 2D.
+Projeto da disciplina **Algoritmos e Programação Avançada** — Universidade Federal de Ouro Preto, 2026.1.
 
-O programa deve ser compilado e executado via linha de comando, recebendo o número de pontos terminais e o raio do domínio como argumentos:
+Implementação de um núcleo simplificado baseado no método **CCO (Constrained Constructive Optimization)** para construção de árvores arteriais em 2D dentro de um domínio circular.
 
-./programa <N_term> <R>
+---
 
-Para visualizar o arquivo gerado (formato .txt, .csv ou .vtk), utilize o script em Python incluído no diretório:
+## Estrutura do Projeto
 
-python3 visualizar.py arvore.csv
+```
+.
+├── main.c          # Algoritmo principal e loop de crescimento
+├── geometria.c/h   # Funções geométricas (distância, interseção, orientação)
+├── arvore.c/h      # Estrutura de árvore binária e operações sobre nós
+├── exportacao.c/h  # Exportação dos segmentos (.csv e .vtk)
+└── visualizar.py   # Script de visualização (Matplotlib / PyVista)
+```
 
+---
+
+## Compilação
+
+```bash
+gcc -O2 -Wall -o programa main.c geometria.c arvore.c exportacao.c -lm
+```
+
+---
+
+## Execução
+
+```bash
+./programa <Nterm> <R>
+```
+
+| Parâmetro | Descrição |
+|-----------|-----------|
+| `Nterm`   | Número de pontos terminais a inserir |
+| `R`       | Raio do domínio circular |
+
+**Exemplos:**
+```bash
+./programa 10 10.0    # pequeno
+./programa 50 10.0    # médio
+./programa 100 10.0   # grande
+```
+
+O programa imprime ao final: número de nós, folhas, comprimento total da árvore e conexões rejeitadas. Dois arquivos são gerados automaticamente: `arvore.csv` e `arvore.vtk`.
+
+---
+
+## Visualização
+
+```bash
+python3 visualizar.py arvore.csv 10.0
+```
+
+O script tenta usar **PyVista** primeiro; se não estiver instalado, usa **Matplotlib** e salva a imagem em `arvore_vis.png`.
+
+Instalar dependências:
+```bash
+pip install matplotlib numpy pyvista
+```
+
+---
+
+## Método
+
+O algoritmo cresce a árvore iterativamente:
+
+1. Inicia com um nó raiz na origem
+2. Gera pontos aleatórios dentro do domínio circular
+3. Para cada ponto, avalia conexões candidatas com a árvore existente
+4. Valida restrições geométricas (sem interseção, distância mínima respeitada)
+5. Seleciona a conexão de menor custo e insere o novo nó
+
+A função custo combina distância euclidiana e penalização angular:
+
+```
+J = α · (d / d_max) + β · (θ / π)
+```
+
+com `α = 1.0` e `β = 0.5`.
