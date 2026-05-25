@@ -23,6 +23,6 @@ bool dentro_dominio (Point a, double r);
 double orient(Point a, Point b, Point c);
 bool intersecta(Segment s1, Segment s2);
 double dist_ponto_segmento(Point p, Segment s);
-/* sobre_segmento e static em geometria.c - nao exposta no header */
+static bool sobre_segmento(Point p, Point a, Point b);
 
 #endif
