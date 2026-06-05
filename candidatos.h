@@ -3,31 +3,24 @@
 
 #include "arvore.h"
 
-#define ALPHA    1.0
-#define BETA     0.5
-#define MAX_NOS  10000
+#define MAX_NOS 10000
 
-// Gera um ponto aleatório dentro do domínio circular (método de rejeição)
+// Gera ponto aleatório dentro do domínio circular (método de rejeição)
 Point gera_ponto_aleatorio(double R);
 
-// Preenche lista[] com todos os nós da árvore e atualiza *total
-void coleta_nos(ptrNo raiz, ptrNo *lista, int *total);
+// Coleta todos os nós não-raiz da árvore.
+// Cada nó coletado define um segmento: nó->pai->p → nó->p
+void coleta_filhos(ptrNo raiz, ptrNo *lista, int *total);
 
-// Preenche lista[] com todos os segmentos pai->filho da árvore
+// Coleta todos os segmentos (para checagem de interseção)
 void coleta_segmentos(ptrNo raiz, Segment *lista, int *total);
 
-// Retorna 1 se a conexão (candidato->p → novo) é geometricamente válida
-int valida_candidato(Point novo, ptrNo candidato,
-                     Segment *segs, int n_segs,
-                     double R, double epsilon);
-
-// Custo básico: distância euclidiana
-double custo(Point novo, ptrNo candidato);
-
-// Percorre todos os nós, valida, calcula custo e retorna o melhor nó
-// Incrementa *rejeitados a cada candidato inválido
+// Percorre todos os segmentos existentes como candidatos.
+// Para cada segmento calcula seu ponto médio e avalia a conexão mid → novo.
+// Retorna o nó-filho do melhor segmento e escreve o ponto médio em *mid_out.
+// Retorna NULL se nenhum segmento válido for encontrado.
 ptrNo seleciona_melhor(Point novo, ptrNo raiz,
                        double R, double epsilon,
-                       int *rejeitados);
+                       int *rejeitados, Point *mid_out);
 
 #endif

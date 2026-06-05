@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
     int    Nterm   = atoi(argv[1]);
     double R       = atof(argv[2]);
-    double epsilon = 0.01 * R;   // distância mínima entre segmentos
+    double epsilon = 0.01 * R;
 
     if (Nterm <= 0 || R <= 0.0) {
         fprintf(stderr, "Erro: Nterm e R devem ser positivos.\n");
@@ -33,8 +33,9 @@ int main(int argc, char *argv[]) {
     // ── Inicialização ───────────────────────────────────────────────
     srand((unsigned int)time(NULL));
 
-    Point origem    = {0.0, 0.0};
-    ptrNo raiz      = cria_no(origem, NULL, 0);
+    // Raiz no ponto mais alto do círculo
+    Point raiz_pt  = {0.0, R};
+    ptrNo raiz     = cria_no(raiz_pt, NULL, 0);
     int   proximo_id = 1;
     int   rejeitados = 0;
     int   inseridos  = 0;
@@ -42,22 +43,34 @@ int main(int argc, char *argv[]) {
     // ── Loop principal ──────────────────────────────────────────────
     for (int i = 0; i < Nterm; i++) {
 
-        // 1. Gera ponto aleatório dentro do domínio
         Point novo = gera_ponto_aleatorio(R);
 
-        // 2. Seleciona o melhor nó da árvore para conectar
-        ptrNo melhor = seleciona_melhor(novo, raiz, R, epsilon, &rejeitados);
+        // ── Caso especial: árvore só tem a raiz (sem segmentos ainda)
+        if (raiz->esq == NULL && raiz->dir == NULL) {
+            if (!dentro_dominio(novo, R)) continue;
 
-        // 3. Se encontrou candidato válido, insere na árvore
-        if (melhor == NULL) {
-            // Nenhuma conexão válida encontrada para este ponto
+            ptrNo novo_no = cria_no(novo, raiz, proximo_id++);
+            if (novo_no == NULL) continue;
+
+            insere_filho(raiz, novo_no);
+            inseridos++;
             continue;
         }
 
-        ptrNo novo_no = cria_no(novo, melhor, proximo_id++);
-        if (novo_no == NULL) continue; // falha de alocação
+        // ── Caso normal: encontra o melhor segmento para bifurcar
+        Point mid;
+        ptrNo filho = seleciona_melhor(novo, raiz, R, epsilon,
+                                       &rejeitados, &mid);
 
-        insere_filho(melhor, novo_no);
+        if (filho == NULL) continue; // nenhum segmento válido encontrado
+
+        // Cria nó de bifurcação no ponto médio do segmento escolhido
+        ptrNo bifurc  = cria_no(mid,  filho->pai, proximo_id++);
+        ptrNo novo_no = cria_no(novo, bifurc,     proximo_id++);
+
+        if (bifurc == NULL || novo_no == NULL) continue;
+
+        insere_bifurcacao(filho->pai, filho, bifurc, novo_no);
         inseridos++;
     }
 

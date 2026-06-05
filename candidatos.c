@@ -8,25 +8,25 @@
 Point gera_ponto_aleatorio(double R) {
     Point p;
     do {
-        // Gera x e y no quadrado [-R, R] x [-R, R]
         p.x = ((double)rand() / RAND_MAX) * 2.0 * R - R;
         p.y = ((double)rand() / RAND_MAX) * 2.0 * R - R;
-    } while (!dentro_dominio(p, R)); // rejeita se cair fora do círculo
+    } while (!dentro_dominio(p, R));
     return p;
 }
 
 // ─────────────────────────────────────────────
-// Coleta de nós (percurso pré-ordem)
+// Coleta nós não-raiz (cada um representa um segmento pai→filho)
 // ─────────────────────────────────────────────
-void coleta_nos(ptrNo raiz, ptrNo *lista, int *total) {
+void coleta_filhos(ptrNo raiz, ptrNo *lista, int *total) {
     if (raiz == NULL) return;
-    lista[(*total)++] = raiz;
-    coleta_nos(raiz->esq, lista, total);
-    coleta_nos(raiz->dir, lista, total);
+    if (raiz->pai != NULL)          // raiz não tem pai, não define segmento
+        lista[(*total)++] = raiz;
+    coleta_filhos(raiz->esq, lista, total);
+    coleta_filhos(raiz->dir, lista, total);
 }
 
 // ─────────────────────────────────────────────
-// Coleta de segmentos (cada nó com seu pai)
+// Coleta segmentos (usado para checar interseções)
 // ─────────────────────────────────────────────
 void coleta_segmentos(ptrNo raiz, Segment *lista, int *total) {
     if (raiz == NULL) return;
@@ -40,88 +40,81 @@ void coleta_segmentos(ptrNo raiz, Segment *lista, int *total) {
 }
 
 // ─────────────────────────────────────────────
-// Validação de candidato
-// ─────────────────────────────────────────────
-int valida_candidato(Point novo, ptrNo candidato,
-                     Segment *segs, int n_segs,
-                     double R, double epsilon) {
-
-    // Restrição 1: ponto deve estar dentro do domínio
-    if (!dentro_dominio(novo, R))
-        return 0;
-
-    // Restrição 2 e 3: verificar contra todos os segmentos existentes
-    Segment novo_seg = {candidato->p, novo};
-
-    for (int i = 0; i < n_segs; i++) {
-
-        // Pula segmentos que compartilham o ponto do candidato
-        // (vizinhos diretos — interseção no extremo é esperada)
-        if ((fabs(segs[i].a.x - candidato->p.x) < EPSILON &&
-             fabs(segs[i].a.y - candidato->p.y) < EPSILON) ||
-            (fabs(segs[i].b.x - candidato->p.x) < EPSILON &&
-             fabs(segs[i].b.y - candidato->p.y) < EPSILON))
-            continue;
-
-        // Restrição 2: sem interseção com segmentos existentes
-        if (intersecta(novo_seg, segs[i]))
-            return 0;
-
-        // Restrição 3: distância mínima ε do novo ponto a segmentos
-        if (dist_ponto_segmento(novo, segs[i]) < epsilon)
-            return 0;
-    }
-
-    return 1;
-}
-
-// ─────────────────────────────────────────────
-// Função custo (distância euclidiana básica)
-// ─────────────────────────────────────────────
-double custo(Point novo, ptrNo candidato) {
-    return distancia(novo, candidato->p);
-}
-
-// ─────────────────────────────────────────────
-// Seleção do melhor candidato
+// Seleção do melhor segmento para bifurcar
 // ─────────────────────────────────────────────
 ptrNo seleciona_melhor(Point novo, ptrNo raiz,
                        double R, double epsilon,
-                       int *rejeitados) {
+                       int *rejeitados, Point *mid_out) {
 
-    // Coleta todos os nós e segmentos da árvore atual
-    ptrNo   lista_nos[MAX_NOS];
-    Segment lista_segs[MAX_NOS];
-    int total_nos  = 0;
+    // Coleta todos os segmentos para checagem de interseção
+    Segment segs[MAX_NOS];
     int total_segs = 0;
+    coleta_segmentos(raiz, segs, &total_segs);
 
-    coleta_nos(raiz, lista_nos, &total_nos);
-    coleta_segmentos(raiz, lista_segs, &total_segs);
+    // Coleta filhos — cada filho define um segmento candidato
+    ptrNo filhos[MAX_NOS];
+    int total_filhos = 0;
+    coleta_filhos(raiz, filhos, &total_filhos);
 
-    ptrNo melhor      = NULL;
+    ptrNo melhor_filho = NULL;
     double menor_custo = DBL_MAX;
 
-    for (int i = 0; i < total_nos; i++) {
+    for (int i = 0; i < total_filhos; i++) {
+        ptrNo filho = filhos[i];
+        ptrNo pai   = filho->pai;
 
-        // Nó já tem dois filhos — árvore binária, sem espaço
-        if (lista_nos[i]->esq != NULL && lista_nos[i]->dir != NULL) {
+        // Ponto médio do segmento pai → filho
+        Point mid = {
+            (pai->p.x + filho->p.x) / 2.0,
+            (pai->p.y + filho->p.y) / 2.0
+        };
+
+        // Restrição 1: ponto médio e novo terminal dentro do domínio
+        if (!dentro_dominio(mid, R) || !dentro_dominio(novo, R)) {
             (*rejeitados)++;
             continue;
         }
 
-        // Valida restrições geométricas
-        if (!valida_candidato(novo, lista_nos[i], lista_segs, total_segs, R, epsilon)) {
+        // Segmento que será criado: mid → novo
+        Segment novo_seg = {mid, novo};
+
+        int valido = 1;
+        for (int k = 0; k < total_segs; k++) {
+
+            // Pula o segmento que está sendo dividido
+            // (ele deixará de existir após a bifurcação)
+            if (fabs(segs[k].a.x - pai->p.x)   < EPSILON &&
+                fabs(segs[k].a.y - pai->p.y)   < EPSILON &&
+                fabs(segs[k].b.x - filho->p.x) < EPSILON &&
+                fabs(segs[k].b.y - filho->p.y) < EPSILON)
+                continue;
+
+            // Restrição 2: sem interseção com outros segmentos
+            if (intersecta(novo_seg, segs[k])) {
+                valido = 0;
+                break;
+            }
+
+            // Restrição 3: distância mínima ε ao novo ponto
+            if (dist_ponto_segmento(novo, segs[k]) < epsilon) {
+                valido = 0;
+                break;
+            }
+        }
+
+        if (!valido) {
             (*rejeitados)++;
             continue;
         }
 
-        // Calcula custo e atualiza melhor
-        double j = custo(novo, lista_nos[i]);
+        // Custo: distância do ponto médio ao novo terminal
+        double j = distancia(mid, novo);
         if (j < menor_custo) {
-            menor_custo = j;
-            melhor = lista_nos[i];
+            menor_custo    = j;
+            melhor_filho   = filho;
+            *mid_out       = mid;
         }
     }
 
-    return melhor; // NULL se nenhum candidato válido foi encontrado
+    return melhor_filho;
 }

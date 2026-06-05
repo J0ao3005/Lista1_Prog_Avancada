@@ -4,14 +4,13 @@ import numpy as np
 import pyvista as pv
 
 def carregar_segmentos(filename):
-    """
-    Lê o CSV gerado pelo MiniCCO-0 e monta arrays de pontos e linhas
-    no formato esperado pelo PyVista.
-    """
     pontos = []
     linhas = []
-    mapa   = {}   # (x, y, z) -> índice
+    mapa   = {}
     idx    = 0
+
+    origens  = set()  # pontos que aparecem como x1,y1 (origem do segmento)
+    destinos = set()  # pontos que aparecem como x2,y2 (destino do segmento)
 
     with open(filename, 'r') as f:
         reader = csv.DictReader(f)
@@ -28,17 +27,22 @@ def carregar_segmentos(filename):
                 pontos.append(p2)
                 idx += 1
 
-            # Formato PyVista: [n_pontos_da_linha, i1, i2]
             linhas.append([2, mapa[p1], mapa[p2]])
+            origens.add(p1)
+            destinos.add(p2)
 
-    return np.array(pontos, dtype=float), linhas
+    # Raiz: aparece como origem mas nunca como destino
+    raiz_candidates = origens - destinos
+    raiz = list(raiz_candidates)[0] if raiz_candidates else pontos[0]
+
+    return np.array(pontos, dtype=float), linhas, np.array([raiz], dtype=float)
 
 
 def main():
     filename = sys.argv[1] if len(sys.argv) > 1 else "arvore.csv"
 
     try:
-        pontos, linhas = carregar_segmentos(filename)
+        pontos, linhas, raiz = carregar_segmentos(filename)
     except FileNotFoundError:
         print(f"Erro: arquivo '{filename}' nao encontrado.")
         print("Execute primeiro: ./programa <Nterm> <R>")
@@ -48,37 +52,32 @@ def main():
         print("Nenhum segmento encontrado no arquivo.")
         sys.exit(1)
 
-    print(f"Pontos carregados : {len(pontos)}")
-    print(f"Segmentos carregados: {len(linhas)}")
+    print(f"Pontos    : {len(pontos)}")
+    print(f"Segmentos : {len(linhas)}")
+    print(f"Raiz      : ({raiz[0][0]:.4f}, {raiz[0][1]:.4f})")
 
     # ── Monta a malha ────────────────────────────────────────────────
     mesh        = pv.PolyData()
     mesh.points = pontos
     mesh.lines  = np.hstack(linhas)
 
-    # Ponto raiz (origem)
-    raiz_mesh = pv.PolyData(np.array([[0.0, 0.0, 0.0]]))
-
     # ── Visualização ─────────────────────────────────────────────────
     plotter = pv.Plotter()
     plotter.background_color = 'white'
 
-    # Segmentos da árvore
     plotter.add_mesh(mesh,
                      line_width=2,
                      color='crimson',
                      label='Segmentos')
 
-    # Todos os pontos (nós)
     plotter.add_mesh(pv.PolyData(pontos),
                      point_size=5,
                      render_points_as_spheres=True,
                      color='steelblue',
                      label='Nos')
 
-    # Raiz em destaque
-    plotter.add_mesh(raiz_mesh,
-                     point_size=12,
+    plotter.add_mesh(pv.PolyData(raiz),
+                     point_size=14,
                      render_points_as_spheres=True,
                      color='gold',
                      label='Raiz')
