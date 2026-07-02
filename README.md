@@ -1,4 +1,4 @@
-# MiniCCO-1 — Escala dos Raios e Otimização Geométrica de Bifurcações
+# MiniCCO-2 — Escala dos Raios e Otimização Geométrica de Bifurcações
 
 Projeto da disciplina **Algoritmos e Programação Avançada** — UFOP, 2026.1.
 
